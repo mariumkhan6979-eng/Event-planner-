@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trip Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky: #e6f0f5;
+    --ink: #12263a;
+    --teal: #0f7b8a;
+    --sun: #f2a900;
+    --paper: #ffffff;
+    --muted: #5b6f80;
+    --line: #c5d6e0;
+    --err: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --sky: #0e1a26; --ink: #e8f1f6; --paper: #162636; --muted: #93a8b8; --line: #2b4256; --teal: #4cc3d3; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--sky); color: var(--ink); font-family: "DM Sans", system-ui, sans-serif; line-height: 1.5; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 18px 64px; }
+  h1 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-weight: 800; font-size: clamp(2rem, 6vw, 3rem); line-height: 1.05; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+
+  form { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 14px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+  label { font-weight: 700; font-size: .9rem; display: block; margin-bottom: 4px; }
+  input { width: 100%; font: inherit; color: var(--ink); background: transparent; border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  input:focus-visible, button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+  .hint { font-size: .82rem; color: var(--muted); margin-top: 4px; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--teal); font: inherit; font-size: .82rem; text-decoration: underline; cursor: pointer; }
+  .go { background: var(--ink); color: var(--sky); border: 0; border-radius: 8px; padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; }
+  .go:disabled { opacity: .6; cursor: wait; }
+
+  #msg { margin-top: 16px; color: var(--err); font-weight: 500; }
+  #result { margin-top: 24px; display: none; }
+
+  /* Boarding-pass style summary */
+  .pass { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; display: grid; grid-template-columns: 1fr auto; overflow: hidden; }
+  .pass .main { padding: 20px; }
+  .route { display: flex; align-items: center; gap: 12px; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: clamp(1.3rem, 4.5vw, 1.9rem); }
+  .route .line { flex: 1; border-top: 2px dashed var(--teal); min-width: 24px; }
+  .place-sub { color: var(--muted); font-size: .85rem; font-weight: 400; font-family: "DM Sans", sans-serif; }
+  .stub { background: var(--sun); color: #12263a; padding: 20px 18px; border-left: 2px dashed var(--ink); text-align: center; display: flex; flex-direction: column; justify-content: center; }
+  .stub b { font-family: "Bricolage Grotesque", sans-serif; font-size: 2rem; line-height: 1; }
+  @media (max-width: 560px) { .pass { grid-template-columns: 1fr; } .stub { border-left: 0; border-top: 2px dashed var(--ink); } }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; color: var(--muted); font-size: .92rem; }
+  .facts strong { color: var(--ink); }
+
+  h2 { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.3rem; margin: 28px 0 10px; }
+  .now { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline; }
+  .now .temp { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 2.6rem; line-height: 1; }
+  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+  .day { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: .88rem; }
+  .day.pick { border: 2px solid var(--teal); }
+  .day .d { font-weight: 700; }
+  .day .t { font-weight: 700; font-size: 1.05rem; margin: 4px 0; }
+  .day .lo { color: var(--muted); font-weight: 400; }
+  .pack { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 20px; }
+  .pack ul { margin: 6px 0 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Where to next?</h1>
+  <p class="sub">Enter where you are leaving from and where you want to go. See how far it is and what the weather will be.</p>
+
+  <form id="form">
+    <div class="row">
+      <div>
+        <label for="from">Leaving from</label>
+        <input id="from" value="Delhi" autocomplete="off">
+        <button type="button" class="linkbtn" id="locate">Use my current location</button>
+      </div>
+      <div>
+        <label for="to">Going to</label>
+        <input id="to" placeholder="e.g. Paris, Tokyo, Dubai" autocomplete="off" required>
+      </div>
+    </div>
+    <div>
+      <label for="date">Travel date (optional)</label>
+      <input id="date" type="date">
+      <div class="hint">Forecasts cover the next 7 days. Dates further away will not be highlighted.</div>
+    </div>
+    <button class="go" id="go" type="submit">Plan my trip</button>
+  </form>
+
+  <div id="msg" role="alert"></div>
+
+  <section id="result" aria-live="polite">
+    <div class="pass">
+      <div class="main">
+        <div class="route">
+          <div><span id="fromName"></span><div class="place-sub" id="fromSub"></div></div>
+          <span class="line"></span>
+          <div><span id="toName"></span><div class="place-sub" id="toSub"></div></div>
+        </div>
+        <div class="facts" id="facts"></div>
+      </div>
+      <div class="stub"><b id="km"></b><span>kilometres</span><small id="mi"></small></div>
+    </div>
+
+    <h2>Weather now in <span id="wxCity"></span></h2>
+    <div class="now" id="now"></div>
+
+    <h2>7-day forecast</h2>
+    <div class="days" id="days"></div>
+
+    <h2>Packing hints</h2>
+    <div class="pack" id="pack"></div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  // Weather code -> text (Open-Meteo WMO codes)
+  const WX = {
+    0:"Clear sky",1:"Mostly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Fog",
+    51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",
+    71:"Light snow",73:"Snow",75:"Heavy snow",80:"Rain showers",81:"Rain showers",82:"Violent showers",
+    95:"Thunderstorm",96:"Thunderstorm with hail",99:"Thunderstorm with hail"
+  };
+  const wx = c => WX[c] || "Unknown";
+
+  // Haversine formula: straight-line distance over the Earth's surface
+  function distanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371, rad = d => d * Math.PI / 180;
+    const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  async function geocode(name) {
+    const url = "https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=" + encodeURIComponent(name);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Could not reach the location service.");
+    const data = await res.json();
+    if (!data.results || !data.results.length) throw new Error('No place found for "' + name + '". Check the spelling.');
+    const r = data.results[0];
+    return { name: r.name, sub: [r.admin1, r.country].filter(Boolean).join(", "), lat: r.latitude, lon: r.longitude };
+  }
+
+  async function getWeather(lat, lon) {
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+      "&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m" +
+      "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+      "&timezone=auto&forecast_days=7";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Could not load the weather.");
+    return res.json();
+  }
+
+  function fmtHours(h) {
+    const m = Math.round(h * 60);
+    return Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0") + " min";
+  }
+
+  function render(from, to, km, w, pickedDate) {
+    $("fromName").textContent = from.name; $("fromSub").textContent = from.sub;
+    $("toName").textContent = to.name;     $("toSub").textContent = to.sub;
+    $("km").textContent = Math.round(km).toLocaleString();
+    $("mi").textContent = Math.round(km * 0.621371).toLocaleString() + " miles";
+
+    // Rough estimates only
+    const facts = ["<span>Flight (approx.): <strong>" + fmtHours(km / 800 + 0.5) + "</strong></span>"];
+    if (km < 2500) facts.push("<span>By road (approx.): <strong>" + fmtHours(km * 1.3 / 60) + "</strong></span>");
+    facts.push("<span>Straight-line distance, not route distance</span>");
+    $("facts").innerHTML = facts.join("");
+
+    $("wxCity").textContent = to.name;
+    const c = w.current;
+    $("now").innerHTML =
+      '<span class="temp">' + Math.round(c.temperature_2m) + '°C</span>' +
+      '<span>' + wx(c.weather_code) + '</span>' +
+      '<span>Wind ' + Math.round(c.wind_speed_10m) + ' km/h</span>' +
+      '<span>Humidity ' + c.relative_humidity_2m + '%</span>';
+
+    const d = w.daily;
+    $("days").innerHTML = d.time.map((t, i) => {
+      const label = new Date(t + "T00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+      return '<div class="day' + (t === pickedDate ? " pick" : "") + '">' +
+        '<div class="d">' + label + '</div>' +
+        '<div class="t">' + Math.round(d.temperature_2m_max[i]) + '° <span class="lo">/ ' + Math.round(d.temperature_2m_min[i]) + '°</span></div>' +
+        '<div>' + wx(d.weather_code[i]) + '</div>' +
+        '<div class="lo">Rain ' + (d.precipitation_probability_max[i] ?? 0) + '%</div></div>';
+    }).join("");
+
+    // Simple packing hints from the forecast
+    const maxT = Math.max(...d.temperature_2m_max), minT = Math.min(...d.temperature_2m_min);
+    const rain = Math.max(...d.precipitation_probability_max.map(x => x ?? 0));
+    const tips = [];
+    if (maxT >= 30) tips.push("Hot days ahead: light clothes, sunscreen, a water bottle.");
+    if (minT <= 10) tips.push("Cold nights: a warm jacket and layers.");
+    if (minT <= 0) tips.push("Freezing temperatures: gloves and a hat.");
+    if (rain >= 50) tips.push("High chance of rain: carry an umbrella or rain jacket.");
+    if (!tips.length) tips.push("Mild weather: regular clothes and a light layer will do.");
+    $("pack").innerHTML = "<ul>" + tips.map(t => "<li>" + t + "</li>").join("") + "</ul>";
+
+    $("result").style.display = "block";
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  $("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    $("msg").textContent = ""; $("result").style.display = "none";
+    $("go").disabled = true; $("go").textContent = "Planning...";
+    try {
+      const fromText = $("from").value.trim(), toText = $("to").value.trim();
+      const from = $("from").dataset.lat
+        ? { name: "Your location", sub: "", lat: +$("from").dataset.lat, lon: +$("from").dataset.lon }
+        : await geocode(fromText);
+      const to = await geocode(toText);
+      const w = await getWeather(to.lat, to.lon);
+      const km = distanceKm(from.lat, from.lon, to.lat, to.lon);
+      render(from, to, km, w, $("date").value);
+    } catch (err) {
+      $("msg").textContent = err.message || "Something went wrong. Check your internet connection and try again.";
+    } finally {
+      $("go").disabled = false; $("go").textContent = "Plan my trip";
+    }
+  });
+
+  // If the person edits the "from" box, stop using the saved GPS position
+  $("from").addEventListener("input", () => { delete $("from").dataset.lat; delete $("from").dataset.lon; });
+
+  $("locate").addEventListener("click", () => {
+    if (!navigator.geolocation) { $("msg").textContent = "Your browser does not support location."; return; }
+    navigator.geolocation.getCurrentPosition(
+      p => {
+        $("from").value = "My current location";
+        $("from").dataset.lat = p.coords.latitude; $("from").dataset.lon = p.coords.longitude;
+        $("msg").textContent = "";
+      },
+      () => { $("msg").textContent = "Location permission was denied. Type your city instead."; }
+    );
+  });
+
+  // Date picker: today to 6 days ahead
+  const today = new Date(), max = new Date(); max.setDate(today.getDate() + 6);
+  const iso = x => x.toISOString().slice(0, 10);
+  $("date").min = iso(today); $("date").max = iso(max);
+</script>
+</body>
+</html>
